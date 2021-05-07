@@ -26,7 +26,10 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.text.DecimalFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -56,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         record = false;
-        values = "INSERT INTO magnetometer (position_name,x,y,z,realX,realY,minterval,mduration) VALUES ";
+        values = "INSERT INTO magnetometer (position_name,x,y,z,realX,realY,minterval,mduration,time) VALUES ";
 
         SensorEventListener magnetSensorListener = new SensorEventListener() {
             @Override
@@ -67,7 +70,9 @@ public class MainActivity extends AppCompatActivity {
                     xValueField.setText(Float.toString(event.values[0]));
                     yValueField.setText(Float.toString(event.values[1]));
                     if(record){
-                        values += "(\""+posName.getText()+"\","+Float.toString(event.values[0])+","+Float.toString(event.values[1])+","+Float.toString(event.values[2])+","+x.getText().toString()+","+y.getText().toString()+","+interval.getText().toString()+","+duration.getText().toString()+"),";
+                        long time = System.currentTimeMillis();
+                        Log.d("curtimer: ",time+"");
+                        values += "(\""+posName.getText()+"\","+Float.toString(event.values[0])+","+Float.toString(event.values[1])+","+Float.toString(event.values[2])+","+x.getText().toString()+","+y.getText().toString()+","+interval.getText().toString()+","+duration.getText().toString()+","+ time +"),";
                     }
                 }
                 Log.d("MY_APP", event.toString());
@@ -140,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 else{
                     button.setText("Not recording");
-                    values = "INSERT INTO magnetometer (position_name,x,y,z,realX,realY,minterval,mduration) VALUES ";
+                    values = "INSERT INTO magnetometer (position_name,x,y,z,realX,realY,minterval,mduration, time) VALUES ";
                     timer.cancel();
                     timer = null;
                     record = false;
