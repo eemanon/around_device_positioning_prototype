@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -25,6 +26,7 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.android.material.tabs.TabLayout;
 import com.opencsv.CSVReader;
 
 import java.io.IOException;
@@ -52,7 +54,11 @@ public class MainActivity extends AppCompatActivity {
     private TextView realy;
     private EditText interval;
     private EditText duration;
+    private TabLayout tabLayout;
+    private Context context;
+    private Button btn_calibrate;
     private SensorManager sensorManager;
+    private SensorEventListener magnetSensorListener;
     private Sensor mag;
     private boolean record;
     private CountDownTimer timer;
@@ -66,6 +72,8 @@ public class MainActivity extends AppCompatActivity {
     Queue<Float> samplesY;
     Queue<Float> samplesZ;
     int bufferLength;
+    float[] calibrationValues;
+
 
 
     @Override
@@ -79,6 +87,7 @@ public class MainActivity extends AppCompatActivity {
         samplesY = new LinkedList<Float>();
         samplesZ = new LinkedList<Float>();
         bufferLength = 10;
+        calibrationValues = new float[]{0.0f, 0.0f, 0.0f};
         //init queue
         for(int i = 0;i<bufferLength;i++){
             samplesX.add(0.0f);
@@ -88,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
 
         values = "INSERT INTO magnetometer (position_name,x,y,z,realX,realY,minterval,mduration,time) VALUES ";
 
-        SensorEventListener magnetSensorListener = new SensorEventListener() {
+        magnetSensorListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
                 if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
@@ -146,9 +155,43 @@ public class MainActivity extends AppCompatActivity {
 
         ip = findViewById(R.id.input_IP);
         posName = findViewById(R.id.input_name);
-        sensorManager.registerListener(magnetSensorListener, sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), Integer.parseInt(interval.getText().toString()));
+        context = this;
+        tabLayout = findViewById(R.id.tabLayout);
+        tabLayout.getTabAt(0).select();
+        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                Log.i("info", "chouette " + tab.getText());
+                if(tab.getText().equals("prototype")){
+                    Log.i("info", "chouette equals acc");
+                    Intent intent = new Intent(context, PrototypeActivity.class);
+                    startActivity(intent);
+                }
+            }
+
+            @Override
+            public void onTabUnselected(TabLayout.Tab tab) {
+
+            }
+
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) {
+
+            }
+        });
         final Button button = findViewById(R.id.btn_record);
         final Button buttonRealPos = findViewById(R.id.btn_showrealPos);
+        btn_calibrate = findViewById(R.id.btn_calibrate);
+        btn_calibrate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                calibrationValues[0]= avg(samplesX);
+                calibrationValues[1]= avg(samplesY);
+                calibrationValues[2]= avg(samplesZ);
+                btn_calibrate.setText("Calibrated");
+            }
+        });
+        sensorManager.registerListener(magnetSensorListener, sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), Integer.parseInt(interval.getText().toString()));
 
         //get mapping
         ArrayList<Float[]> mapping = importMapping();
@@ -212,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
         buttonRealPos.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                float [] pos = calcPos(mapping, avg(samplesX), avg(samplesY));
+                float [] pos = calcPos(mapping, avg(samplesX)-calibrationValues[0], avg(samplesY)-calibrationValues[1]);
                 realx.setText(pos[0]+"");
                 realy.setText(pos[1]+"");
             }
@@ -224,7 +267,7 @@ public class MainActivity extends AppCompatActivity {
         ArrayList<Float[]> result = new ArrayList<>();
         try {
             Log.i("Info", "test");
-            CSVReader reader = new CSVReader(new InputStreamReader(getResources().openRawResource(R.raw.outputcut)));
+            CSVReader reader = new CSVReader(new InputStreamReader(getResources().openRawResource(R.raw.magnetometer1cm20x33_minusearth)));
             String[] nextLine;
             boolean firstLine=true;
             while ((nextLine = reader.readNext()) != null) {
@@ -233,8 +276,12 @@ public class MainActivity extends AppCompatActivity {
                     firstLine=false;
                     continue;
                 }
-                //Log.i("Info",""+nextLine[0]);
-                result.add(new Float[] {Float.parseFloat(nextLine[0]),Float.parseFloat(nextLine[1]), Float.parseFloat(nextLine[6]), Float.parseFloat(nextLine[5])});
+                String xReal = nextLine[0].toString();
+                String yReal = nextLine[1].toString();
+                String xValue = nextLine[2].toString();
+                String yValue = nextLine[3].toString();
+                Log.i("info", "values: "+xValue + ", "+yValue+", "+xReal+", "+yReal);
+                result.add(new Float[] {Float.parseFloat(xReal),Float.parseFloat(yReal), Float.parseFloat(xValue), Float.parseFloat(yValue)});
             }
         } catch (IOException e) {
 
@@ -257,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
         float realY = 0f;
         for (Float[] f : posList){
             double distance = Math.sqrt((f[2]-xt)*(f[2]-xt)+(f[3]-yt)*(f[3]-yt));
-            Log.i("Debug", "distance: "+distance);
+            //Log.i("Debug", "distance: "+distance);
             if (distance<previous_distance){
                 previous_distance = distance;
                 result[0] = f[0];
@@ -265,5 +312,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return result;
+    }
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        tabLayout.getTabAt(0).select();
     }
 }
